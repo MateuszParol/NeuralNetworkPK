@@ -1,342 +1,139 @@
-# ⚔️ Medieval Neural Network - Średniowieczna Sieć Neuronowa ⚔️
+# Neural Network - Character Recognition
 
-![Python](https://img.shields.io/badge/Python-3.7+-blue.svg)
-![NumPy](https://img.shields.io/badge/NumPy-Required-green.svg)
-![License](https://img.shields.io/badge/License-MIT-yellow.svg)
+A clean, modern neural network application for recognizing handwritten characters (0-9, A-Z).
 
-## 📜 Opis projektu
+## Features
 
-**Medieval Neural Network** to interaktywna aplikacja do rozpoznawania ręcznie pisanych znaków (cyfry 0-9 i litery A-Z) z wykorzystaniem prostej sieci neuronowej. Projekt został zaprojektowany w **średniowiecznym stylu gothic** z:
+- **Interactive Drawing**: Draw characters with your mouse
+- **Real-time Recognition**: Instant character prediction with confidence scores
+- **Network Visualization**: Live visualization of neural network activity
+- **Training on EMNIST**: Load and train on the EMNIST dataset
+- **Modern UI**: Clean, minimalist interface with Material Design
 
-- 🏰 Ciemną, pergaminową paletą kolorów (brązy, złoto, czerwień heraldyczna)
-- ✍️ **Staroangielską czcionką** ("Old English Text MT") dla wyświetlanych liter
-- 🎨 Ozdobnymi ramkami i separatorami w stylu iluminowanych manuskryptów
-- 🧠 Wizualizacją sieci neuronowej na żywo
-- 📚 Kodem zoptymalizowanym dla początkujących z obszernymi komentarzami
-
----
-
-## 🎯 Funkcje
-
-### ✨ Główne funkcje:
-
-1. **Interaktywne rysowanie**
-   - Rysuj cyfry i litery myszką na canvas'ie
-   - Automatyczne rozpoznawanie po puszczeniu przycisku
-   - Wyświetlanie pewności rozpoznania
-
-2. **Wizualizacja sieci na żywo**
-   - Zobacz jak pracują neurony w czasie rzeczywistym
-   - Podświetlenie aktywnych neuronów (gradient złoty)
-   - Linie pokazujące najsilniejsze połączenia (zielone = pozytywne, czerwone = negatywne)
-
-3. **Trening na danych EMNIST**
-   - Wczytywanie danych z pliku CSV
-   - Tasowanie danych dla lepszego uczenia
-   - Pasek postępu i statusy treningu
-   - Możliwość treningu na 20 000 przykładów
-
-4. **Styl średniowieczny**
-   - Gotycka paleta kolorów (brązy, złoto, pergamin)
-   - Staroangielska czcionka dla rozpoznanych znaków
-   - Ozdobne ramki i separatory
-
----
-
-## 📦 Wymagania
-
-### Wymagane biblioteki:
+## Requirements
 
 ```bash
-Python 3.7+
-numpy
-tkinter (wbudowany w Python)
-pandas (opcjonalnie, tylko do treningu)
-```
-
-### Instalacja zależności:
-
-```bash
-# NumPy (wymagany)
-pip install numpy
-
-# Pandas (opcjonalnie, tylko dla treningu na CSV)
-pip install pandas
-```
-
----
-
-## 🚀 Uruchomienie
-
-### Podstawowe uruchomienie:
-
-```bash
-python neuralnetwork.py
-```
-
-### Uruchomienie z wirtualnym środowiskiem:
-
-```bash
-# Utwórz wirtualne środowisko
-python -m venv venv
-
-# Aktywuj środowisko
-# Na Windows:
-venv\Scripts\activate
-# Na Linux/Mac:
-source venv/bin/activate
-
-# Zainstaluj zależności
 pip install numpy pandas
+```
 
-# Uruchom aplikację
+- Python 3.7+
+- numpy (required)
+- pandas (optional, for training)
+- tkinter (built-in)
+
+## Quick Start
+
+```bash
 python neuralnetwork.py
 ```
 
----
+## Usage
 
-## 📖 Instrukcja użycia
+### Drawing & Recognition
 
-### 1️⃣ Rysowanie i rozpoznawanie
+1. **Draw** a character on the white canvas (left panel)
+2. **Release** the mouse button to see the prediction
+3. **Clear** to reset and draw again
 
-1. **Narysuj znak** na lewym panelu (czarny canvas):
-   - Użyj lewego przycisku myszy do rysowania
-   - Rysuj grubym złotym pędzlem
+### Training
 
-2. **Puść przycisk myszy**:
-   - Sieć automatycznie rozpozna znak
-   - Wynik pojawi się na prawym panelu (duża staroangielska czcionka)
-   - Zobaczysz pewność rozpoznania w procentach
+1. Click **"Load & Train"**
+2. Select your EMNIST CSV file (`emnist-balanced-train.csv`)
+3. Wait for training to complete (~15,000 samples)
+4. Test the trained network by drawing characters
 
-3. **Wyczyść canvas**:
-   - Kliknij prawym przyciskiem myszy
-   - Lub użyj przycisku "🗡️ WYCZYŚĆ"
+### Visualization
 
-### 2️⃣ Wizualizacja sieci
+The center panel shows the neural network in action:
+- **Left**: Input layer (20 representative nodes of 784 total)
+- **Center**: Hidden layer (32 visible nodes of 128 total)
+- **Right**: Output layer (36 nodes for 0-9, A-Z)
+- **Lines**: Active connections (green = positive weights, red = negative)
 
-- **Środkowy panel** pokazuje jak pracuje sieć:
-  - Lewa kolumna: neurony wejściowe (20 reprezentacyjnych z 784)
-  - Środek: 140 neuronów ukrytych (w siatce)
-  - Prawa kolumna: 36 neuronów wyjściowych (0-9, A-Z)
-
-- **Kolory neuronów**:
-  - Ciemny brąz = nieaktywny
-  - Gradient złoty = aktywny
-  - Jasne złoto = zwycięski neuron
-
-- **Linie połączeń**:
-  - Zielone = pozytywne wagi
-  - Czerwone = negatywne wagi
-  - Grubość = siła połączenia
-
-### 3️⃣ Trening sieci
-
-1. **Pobierz dane EMNIST**:
-   - Pobierz `emnist-balanced-train.csv`
-   - Link: [EMNIST Dataset](https://www.nist.gov/itl/products-and-services/emnist-dataset)
-
-2. **Uruchom trening**:
-   - Kliknij "⚡ WCZYTAJ I TRENUJ ⚡"
-   - Wybierz plik CSV
-   - Obserwuj pasek postępu
-   - Trening zajmuje 5-15 minut (20 000 przykładów)
-
-3. **Po treningu**:
-   - Sieć jest gotowa do użycia
-   - Rysuj znaki i testuj dokładność
-
-### 4️⃣ Ustawienia
-
-- **Limiter wag** (lewy panel):
-  - Kontroluje maksymalną wartość wag sieci
-  - Zakres: 0.5 - 10.0
-  - Domyślnie: 3.0
-  - Wpływa na wizualizację połączeń
-
----
-
-## 🧠 Architektura sieci neuronowej
-
-### Struktura:
+## Architecture
 
 ```
-Warstwa wejściowa:  784 neurony (28×28 pikseli)
-        ↓
-Warstwa ukryta:     140 neuronów (funkcja sigmoid)
-        ↓
-Warstwa wyjściowa:  36 neuronów (0-9, A-Z)
+Input Layer:  784 neurons (28x28 pixels)
+      ↓
+Hidden Layer: 128 neurons (sigmoid activation)
+      ↓
+Output Layer: 36 neurons (softmax activation)
 ```
 
-### Techniki użyte:
+### Key Features
 
-- **Funkcja aktywacji**: Sigmoid
-- **Algorytm uczenia**: Backpropagation (wsteczna propagacja błędu)
-- **Inicjalizacja wag**: He initialization
-- **Współczynnik uczenia**: 0.1
-- **Clipping wag**: Zapobiega eksplozji wartości
+- **Xavier Initialization**: For better convergence with sigmoid
+- **Softmax Output**: Proper probability distribution for multi-class classification
+- **Learning Rate**: 0.05 (balanced for stability and speed)
+- **Weight Clipping**: Prevents exploding gradients
 
-### Kod dla początkujących:
+## Code Structure (318 lines)
 
-- ✅ Obszerne komentarze w języku polskim
-- ✅ Docstringi dla każdej funkcji
-- ✅ Wyjaśnienia wzorów matematycznych
-- ✅ Czytelna struktura kodu
-- ✅ Tylko numpy + tkinter (proste zależności)
+- **Lines 1-16**: Imports and configuration
+- **Lines 18-64**: `NeuralNetwork` class (forward pass, backpropagation)
+- **Lines 66-317**: `App` class (UI, visualization, training)
 
----
+## EMNIST Dataset
 
-## 🎨 Paleta kolorów średniowiecznych
-
-| Element | Kolor | Hex |
-|---------|-------|-----|
-| Tło główne | Ciemny brąz | `#1A0F0A` |
-| Panele | Drewno | `#2C1810` |
-| Złoto | Akcent | `#D4AF37` |
-| Złoto jasne | Highlight | `#FFD700` |
-| Czerwień heraldyczna | Błędy | `#8B0000` |
-| Zieleń szlachetna | Sukces | `#2E8B57` |
-| Tekst pergaminowy | Główny | `#F5E6D3` |
-
----
-
-## 🔧 Optymalizacje
-
-### Dla wydajności:
-
-1. **Tylko numpy**: Operacje wektorowe zamiast pętli
-2. **Wizualizacja Top 30**: Pokazuje tylko 30 najbardziej aktywnych neuronów
-3. **Clipping**: Zapobiega overflow i eksplozji wartości
-4. **Threading**: Trening w osobnym wątku (GUI nie zamarza)
-
-### Dla początkujących:
-
-1. **Komentarze**: Każda sekcja dokładnie opisana
-2. **Polskie nazwy zmiennych**: `wagi`, `biasy`, `warstwa_ukryta`
-3. **Docstringi**: Dokumentacja każdej funkcji
-4. **Wzory matematyczne**: Wyjaśnienia algorytmów
-
----
-
-## 📊 Format danych EMNIST
-
-Plik CSV powinien mieć format:
-
+The application expects CSV format:
 ```
-etykieta, piksel_1, piksel_2, ..., piksel_784
+label, pixel_0, pixel_1, ..., pixel_783
 5, 0, 0, 15, ..., 0
 10, 0, 23, 45, ..., 12
-...
 ```
 
-- Kolumna 0: etykieta (0-46 w pełnym EMNIST, 0-35 używane)
-- Kolumny 1-784: wartości pikseli (0-255)
-- Bez nagłówka
+- Column 0: Label (0-35 used)
+- Columns 1-784: Pixel values (0-255)
+- No header
 
-**Mapowanie etykiet**:
-- 0-9: cyfry 0-9
-- 10-35: litery A-Z
+**Label mapping**:
+- 0-9: Digits
+- 10-35: Letters A-Z
 
----
+Download EMNIST: [NIST Website](https://www.nist.gov/itl/products-and-services/emnist-dataset)
 
-## 🐛 Rozwiązywanie problemów
+## Troubleshooting
 
-### Problem: Brak czcionki "Old English Text MT"
-
-**Rozwiązanie**:
-- Windows: Czcionka jest wbudowana
-- Linux: Zainstaluj czcionki MS: `sudo apt install ttf-mscorefonts-installer`
-- Mac: Zainstaluj Font Book → "Old English Text MT"
-- Fallback: Kod automatycznie użyje czcionki domyślnej
-
-### Problem: "No module named 'numpy'"
-
-**Rozwiązanie**:
+### Import Error: No module named 'numpy'
 ```bash
 pip install numpy
 ```
 
-### Problem: "No module named 'pandas'"
-
-**Rozwiązanie**:
+### Import Error: No module named 'pandas'
 ```bash
 pip install pandas
 ```
-(Pandas jest potrzebny tylko do treningu)
+(Only needed for training)
 
-### Problem: Okno GUI nie otwiera się
-
-**Rozwiązanie**:
-- Sprawdź czy tkinter jest zainstalowany:
-  ```bash
-  python -c "import tkinter"
-  ```
-- Linux: Zainstaluj `python3-tk`:
-  ```bash
-  sudo apt install python3-tk
-  ```
-
----
-
-## 📝 Struktura plików
-
-```
-NeuralNetworkPK/
-├── neuralnetwork.py         # Główna aplikacja
-├── README.md               # Ten plik
-├── .gitignore              # Ignorowane pliki
-└── emnist-balanced-train.csv  # Dane treningowe (opcjonalnie)
+### tkinter not found (Linux)
+```bash
+sudo apt install python3-tk
 ```
 
----
+### Network always predicts same character
 
-## 🤝 Kontrybutor
+This happens with an untrained network. Solution:
+1. Load EMNIST dataset
+2. Click "Load & Train"
+3. Wait for training to complete
+4. Try drawing again
 
-Ten projekt został stworzony jako interaktywna aplikacja edukacyjna do nauki sieci neuronowych.
+## Design Philosophy
 
-**Optymalizacje**:
-- ✅ Średniowieczny design z gotycką estetyką
-- ✅ Staroangielska czcionka dla wyświetlanych liter
-- ✅ Kod zoptymalizowany i czytelny dla początkujących
-- ✅ Używa czystego Pythona + numpy
-- ✅ Dokładne komentarze w języku polskim
+- **Clean & Modern**: Material Design inspired
+- **Minimalist**: No unnecessary elements
+- **Functional**: Every element serves a purpose
+- **Readable**: Clear typography and spacing
 
----
+## Color Palette
 
-## 📜 Licencja
+- Background: `#F5F5F5` (Light gray)
+- Panels: `#FFFFFF` (White)
+- Primary: `#2196F3` (Blue)
+- Success: `#4CAF50` (Green)
+- Error: `#F44336` (Red)
+- Text: `#333333` (Dark gray)
 
-MIT License - możesz swobodnie używać, modyfikować i dystrybuować ten kod.
+## License
 
----
-
-## 🎓 Edukacyjne zasoby
-
-### Zrozumienie sieci neuronowych:
-
-1. **Forward Pass** (linie 143-171):
-   - Jak dane przepływają przez sieć
-   - Funkcja sigmoid i jej rola
-   - Mnożenie macierzy (numpy.dot)
-
-2. **Backpropagation** (linie 174-218):
-   - Jak sieć się uczy z błędów
-   - Gradient descent (zejście gradientowe)
-   - Aktualizacja wag i biasów
-
-3. **Wizualizacja** (linie 504-563):
-   - Jak interpretować aktywacje neuronów
-   - Co pokazują połączenia między neuronami
-   - Różnica między wagami pozytywnymi a negatywnymi
-
----
-
-## ⚔️ Medieval Easter Eggs
-
-- 🏰 Wszystkie ikony i teksty w stylu średniowiecznym
-- ⚔️ Miecz jako symbol czyszczenia
-- 📜 Pergamin jako motyw przewodni
-- 🧠 Mózg jako symbol inteligencji
-- ⚡ Błyskawica jako symbol mocy obliczeniowej
-
----
-
-**Stworzono z ⚔️ w stylu średniowiecznym dla miłośników AI i historii!**
+MIT License - Free to use and modify.
