@@ -1,317 +1,215 @@
 import numpy as np
 import tkinter as tk
-from tkinter import messagebox
-import urllib.request
-import os
+from tkinter import messagebox, ttk, filedialog
+import threading
 
-# --- KONFIGURACJA INŻYNIERSKA ---
-ROZMIAR_SIATKI = 28  # Standard MNIST
-WEJSCIA = ROZMIAR_SIATKI * ROZMIAR_SIATKI  # 784
-UKRYTE = 64          # Warstwa ukryta (zmniejszona lekko dla czytelności wizualizacji)
-WYJSCIA = 36         # 0-9 + A-Z
+# Sprawdzamy czy mamy pandas
+try:
+    import pandas as pd
+    PANDAS_DOSTEPNY = True
+except ImportError:
+    PANDAS_DOSTEPNY = False
+    print("BRAK PANDAS! Zainstaluj: pip install pandas")
+
+# --- KONFIGURACJA ---
+THEME = {
+    "bg": "#121212", "panel": "#1E1E1E", "accent": "#007acc", 
+    "text": "#e0e0e0", "synapse": "#00E676", "alert": "#FF5252"
+}
+
+ROZMIAR = 28
+WEJSCIA = ROZMIAR * ROZMIAR
+UKRYTE = 140 # Zwiększyłem lekko liczbę neuronów dla lepszej pamięci liter
+WYJSCIA = 36 
 ZNAKI = list("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ")
-
-# Kolorystyka "Professional Dark"
-COL_BG = "#1e1e1e"       # Tło główne
-COL_PANEL = "#252526"    # Tło paneli
-COL_ACCENT = "#007acc"   # Niebieski akcent (VS Code style)
-COL_TEXT = "#cccccc"     # Szary tekst
-COL_NEURON_OFF = "#333333"
-COL_NEURON_ON = "#00ff00"
 
 class SiecNeuronowa:
     def __init__(self):
         np.random.seed(42)
-        # Inicjalizacja He (Dla Sigmoida/ReLU)
         self.w1 = np.random.randn(WEJSCIA, UKRYTE) * np.sqrt(2/WEJSCIA)
-        self.b1 = np.zeros((1, UKRYTE))
         self.w2 = np.random.randn(UKRYTE, WYJSCIA) * np.sqrt(2/UKRYTE)
+        self.b1 = np.zeros((1, UKRYTE))
         self.b2 = np.zeros((1, WYJSCIA))
         
-        # Pamięć stanów do wizualizacji
-        self.ukryta_aktywacja = np.zeros((1, UKRYTE))
-        self.wyjscie_aktywacja = np.zeros((1, WYJSCIA))
+        self.ukryta = np.zeros((1, UKRYTE))
+        self.wyjscie = np.zeros((1, WYJSCIA))
 
     def sigmoid(self, x):
-        # Zabezpieczenie numeryczne
         return 1 / (1 + np.exp(-np.clip(x, -500, 500)))
 
     def pochodna_sigmoid(self, x):
         return x * (1 - x)
 
     def forward(self, x):
-        # Warstwa 1
         z1 = np.dot(x, self.w1) + self.b1
-        self.ukryta_aktywacja = self.sigmoid(z1)
-        
-        # Warstwa 2
-        z2 = np.dot(self.ukryta_aktywacja, self.w2) + self.b2
-        self.wyjscie_aktywacja = self.sigmoid(z2)
-        return self.wyjscie_aktywacja
+        self.ukryta = self.sigmoid(z1)
+        z2 = np.dot(self.ukryta, self.w2) + self.b2
+        self.wyjscie = self.sigmoid(z2)
+        return self.wyjscie
 
-    def backward(self, x, y, lr=0.1):
-        # Propagacja w przód (musimy mieć świeży stan)
+    def train(self, x, y, lr=0.1, limit=5.0):
         wyjscie = self.forward(x)
         
-        # Obliczenie błędu
         blad = y - wyjscie
+        d_out = blad * self.pochodna_sigmoid(wyjscie)
         
-        # Propagacja wsteczna
-        d_wyjscie = blad * self.pochodna_sigmoid(wyjscie)
-        blad_ukryty = d_wyjscie.dot(self.w2.T)
-        d_ukryty = blad_ukryty * self.pochodna_sigmoid(self.ukryta_aktywacja)
-
-        # Aktualizacja wag
-        self.w2 += self.ukryta_aktywacja.T.dot(d_wyjscie) * lr
-        self.b2 += np.sum(d_wyjscie, axis=0, keepdims=True) * lr
-        self.w1 += x.T.dot(d_ukryty) * lr
-        self.b1 += np.sum(d_ukryty, axis=0, keepdims=True) * lr
-
-        # --- LIMITER WAG (Weight Clipping) ---
-        # Tutaj znajduje się mechanizm zapobiegający "wybuchom" wag
-        limit = 5.0
+        blad_hid = d_out.dot(self.w2.T)
+        d_hid = blad_hid * self.pochodna_sigmoid(self.ukryta)
+        
+        self.w2 += self.ukryta.T.dot(d_out) * lr
+        self.b2 += np.sum(d_out, axis=0, keepdims=True) * lr
+        self.w1 += x.T.dot(d_hid) * lr
+        self.b1 += np.sum(d_hid, axis=0, keepdims=True) * lr
+        
         self.w1 = np.clip(self.w1, -limit, limit)
         self.w2 = np.clip(self.w2, -limit, limit)
 
-class App:
+class AplikacjaV8:
     def __init__(self, root):
         self.root = root
-        self.root.title("Neural Network Studio v4.0")
-        self.root.geometry("1200x700")
-        self.root.configure(bg=COL_BG)
+        self.root.title("Neural Network v8.0 (Shuffled EMNIST)")
+        self.root.geometry("1280x800")
+        self.root.configure(bg=THEME["bg"])
         
         self.siec = SiecNeuronowa()
-        self.plansza = np.zeros((ROZMIAR_SIATKI, ROZMIAR_SIATKI))
+        self.plansza = np.zeros((ROZMIAR, ROZMIAR))
         
-        self._buduj_interfejs()
-        self._inicjuj_wizualizacje_sieci()
+        self.buduj_interfejs()
+        self.inicjuj_wizualizacje()
 
-    def _buduj_interfejs(self):
-        # Główny kontener
-        main_frame = tk.Frame(self.root, bg=COL_BG)
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-
-        # --- KOLUMNA 1: RYSOWANIE (INPUT) ---
-        col1 = tk.Frame(main_frame, bg=COL_PANEL, width=300)
-        col1.pack(side=tk.LEFT, fill=tk.Y, padx=5)
+    def buduj_interfejs(self):
+        main = tk.Frame(self.root, bg=THEME["bg"])
+        main.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
         
-        tk.Label(col1, text="INPUT (28x28)", fg=COL_TEXT, bg=COL_PANEL, font=("Consolas", 12)).pack(pady=10)
+        # LEWY PANEL (RYSOWANIE)
+        p1 = tk.Frame(main, bg=THEME["panel"], width=320)
+        p1.pack(side=tk.LEFT, fill=tk.Y, padx=10)
+        p1.pack_propagate(False)
         
-        self.canvas = tk.Canvas(col1, width=280, height=280, bg="black", highlightthickness=0)
-        self.canvas.pack(pady=10, padx=10)
-        self.canvas.bind("<B1-Motion>", self._rysuj)
-        self.canvas.bind("<ButtonRelease-1>", self._koniec_rysowania)
-        self.canvas.bind("<Button-3>", lambda e: self._reset())
-
-        tk.Button(col1, text="RESET [Prawy Przycisk]", command=self._reset, 
-                  bg="#d63031", fg="white", relief="flat", pady=5).pack(fill=tk.X, padx=10)
-
-        # --- KOLUMNA 2: WIZUALIZACJA SIECI (HIDDEN LAYER) ---
-        col2 = tk.Frame(main_frame, bg=COL_PANEL)
-        col2.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5)
+        tk.Label(p1, text="RYSOWANIE", fg=THEME["text"], bg=THEME["panel"], font=("Segoe UI", 12, "bold")).pack(pady=15)
         
-        tk.Label(col2, text="ARCHITEKTURA SIECI (LIVE)", fg=COL_TEXT, bg=COL_PANEL, font=("Consolas", 12)).pack(pady=10)
+        self.canvas = tk.Canvas(p1, width=280, height=280, bg="black", highlightthickness=0)
+        self.canvas.pack(pady=10)
+        self.canvas.bind("<B1-Motion>", self.rysuj)
+        self.canvas.bind("<ButtonRelease-1>", self.koniec_rysowania)
+        self.canvas.bind("<Button-3>", lambda e: self.czysc())
+
+        tk.Button(p1, text="RESET (PRAWY PRZYCISK)", command=self.czysc, bg="#D32F2F", fg="white", 
+                  relief="flat", font=("Segoe UI", 10, "bold"), pady=8).pack(fill=tk.X, padx=20, pady=10)
         
-        # Canvas do rysowania neuronów i połączeń
-        self.viz_canvas = tk.Canvas(col2, bg="#111111", highlightthickness=0)
-        self.viz_canvas.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        tk.Label(p1, text="LIMITER WAG (Max Value)", fg="gray", bg=THEME["panel"]).pack(pady=(30,5))
+        self.var_limit = tk.DoubleVar(value=2.0)
+        style = ttk.Style()
+        style.theme_use('default')
+        style.configure("TScale", background=THEME["panel"])
+        ttk.Scale(p1, from_=0.1, to=10.0, variable=self.var_limit).pack(fill=tk.X, padx=20)
 
-        # --- KOLUMNA 3: STEROWANIE I WYNIKI (OUTPUT) ---
-        col3 = tk.Frame(main_frame, bg=COL_PANEL, width=300)
-        col3.pack(side=tk.LEFT, fill=tk.Y, padx=5)
+        # ŚRODKOWY PANEL (WIZUALIZACJA)
+        p2 = tk.Frame(main, bg=THEME["bg"])
+        p2.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10)
         
-        tk.Label(col3, text="STEROWANIE / WYNIKI", fg=COL_TEXT, bg=COL_PANEL, font=("Consolas", 12)).pack(pady=10)
+        tk.Label(p2, text="NEURAL PATHWAYS (LIVE)", fg="#555", bg=THEME["bg"], font=("Segoe UI", 10)).pack(pady=5)
+        self.vis_canvas = tk.Canvas(p2, bg=THEME["bg"], highlightthickness=0)
+        self.vis_canvas.pack(fill=tk.BOTH, expand=True)
+
+        # PRAWY PANEL (WYNIKI I TRENING)
+        p3 = tk.Frame(main, bg=THEME["panel"], width=320)
+        p3.pack(side=tk.LEFT, fill=tk.Y, padx=10)
+        p3.pack_propagate(False)
         
-        # Wyświetlacz wyniku
-        self.lbl_wynik = tk.Label(col3, text="?", font=("Arial", 48, "bold"), fg=COL_ACCENT, bg=COL_PANEL)
-        self.lbl_wynik.pack(pady=20)
-        self.lbl_detale = tk.Label(col3, text="Oczekiwanie...", fg=COL_TEXT, bg=COL_PANEL)
-        self.lbl_detale.pack()
-
-        # Przyciski
-        tk.Button(col3, text="ZGADNIJ", command=self._zgadnij, 
-                  bg=COL_ACCENT, fg="white", font=("Arial", 12, "bold"), relief="flat", pady=10).pack(fill=tk.X, padx=10, pady=20)
-
-        tk.Label(col3, text="TRENING", fg=COL_TEXT, bg=COL_PANEL).pack(pady=5)
+        tk.Label(p3, text="ROZPOZNANO:", fg=THEME["text"], bg=THEME["panel"], font=("Segoe UI", 12)).pack(pady=15)
+        self.lbl_wynik = tk.Label(p3, text="?", font=("Segoe UI", 80, "bold"), fg=THEME["accent"], bg=THEME["panel"])
+        self.lbl_wynik.pack()
+        self.lbl_pewnosc = tk.Label(p3, text="0%", fg="gray", bg=THEME["panel"], font=("Segoe UI", 12))
+        self.lbl_pewnosc.pack()
         
-        self.btn_mnist = tk.Button(col3, text="Pobierz i Trenuj MNIST (0-9)", command=self._start_mnist, 
-                  bg="#f0932b", fg="black", relief="flat")
-        self.btn_mnist.pack(fill=tk.X, padx=10, pady=5)
+        tk.Frame(p3, height=1, bg="#444").pack(fill=tk.X, pady=30, padx=20)
         
-        # Lista rozwijana do ręcznego uczenia
-        self.var_znak = tk.StringVar(value="A")
-        frame_reczny = tk.Frame(col3, bg=COL_PANEL)
-        frame_reczny.pack(fill=tk.X, padx=10, pady=10)
+        # EMNIST
+        tk.Label(p3, text="TRENING (CSV)", fg=THEME["text"], bg=THEME["panel"], font=("Segoe UI", 11, "bold")).pack(pady=5)
+        tk.Label(p3, text="Wymaga: emnist-balanced-train.csv", fg="gray", bg=THEME["panel"], font=("Segoe UI", 8)).pack()
         
-        tk.OptionMenu(frame_reczny, self.var_znak, *ZNAKI).pack(side=tk.LEFT)
-        tk.Button(frame_reczny, text="Naucz", command=self._ucz_recznie, bg="#6ab04c", fg="white", relief="flat").pack(side=tk.RIGHT, fill=tk.X, expand=True)
-
-        self.lbl_status = tk.Label(col3, text="Gotowy", fg="gray", bg=COL_PANEL, font=("Arial", 8))
-        self.lbl_status.pack(side=tk.BOTTOM, pady=10)
-
-    def _inicjuj_wizualizacje_sieci(self):
-        # Rysuje statyczną strukturę sieci (kółka), które potem będziemy podświetlać
-        self.viz_canvas.update()
-        w = self.viz_canvas.winfo_width()
-        h = self.viz_canvas.winfo_height()
+        self.btn_load = tk.Button(p3, text="WCZYTAJ I TRENUJ (MIX)", command=self.start_watek_emnist, 
+                                  bg="#0984e3", fg="white", font=("Segoe UI", 10, "bold"), pady=12, relief="flat", cursor="hand2")
+        self.btn_load.pack(fill=tk.X, padx=20, pady=15)
         
-        self.neuron_coords = [] # Lista współrzędnych do animacji
+        self.progress = ttk.Progressbar(p3, orient="horizontal", length=200, mode="determinate")
+        self.progress.pack(fill=tk.X, padx=20, pady=5)
         
-        # Warstwa wejściowa (symboliczna - lewa strona)
-        x_in = 50
-        for i in range(10): # Rysujemy tylko 10 symbolicznych wejść
-            y = (h / 12) * (i + 1)
-            self.viz_canvas.create_oval(x_in-5, y-5, x_in+5, y+5, fill=COL_NEURON_OFF, outline="")
-        
-        # Warstwa ukryta (środek)
-        x_hid = w / 2
-        # Rysujemy reprezentację 64 neuronów w siatce (np. 4 kolumny po 16)
-        self.hidden_ids = []
-        for i in range(UKRYTE):
-            row = i % 16
-            col = i // 16
-            xx = x_hid - 30 + (col * 20)
-            yy = 50 + (row * (h-100)/16)
-            nid = self.viz_canvas.create_oval(xx-4, yy-4, xx+4, yy+4, fill=COL_NEURON_OFF, outline="gray")
-            self.hidden_ids.append(nid)
+        self.lbl_status = tk.Label(p3, text="Oczekiwanie na dane...", fg="gray", bg=THEME["panel"], wraplength=280)
+        self.lbl_status.pack(pady=5)
 
-        # Warstwa wyjściowa (prawa strona)
-        x_out = w - 50
-        self.output_ids = []
-        for i in range(WYJSCIA):
-            # Rysujemy w 2 kolumnach żeby się zmieściło
-            col = i % 2
-            row = i // 2
-            xx = x_out + (col * 20)
-            yy = 20 + (row * (h-40)/18)
-            
-            # Kółko
-            nid = self.viz_canvas.create_oval(xx-6, yy-6, xx+6, yy+6, fill=COL_NEURON_OFF, outline="")
-            self.output_ids.append(nid)
-            # Etykieta (0, 1, A, B...)
-            self.viz_canvas.create_text(xx+15, yy, text=ZNAKI[i], fill="gray", font=("Arial", 8))
-
-        # Linie połączeń (symboliczne) - rysujemy je pod spodem
-        self.viz_canvas.tag_lower("all")
-
-    def _aktualizuj_wizualizacje_live(self):
-        # Pobieramy stany aktywacji z mózgu
-        hidden_acts = self.siec.ukryta_aktywacja[0] # wektor 64 liczb
-        output_acts = self.siec.wyjscie_aktywacja[0] # wektor 36 liczb
-
-        # 1. Aktualizacja Warstwy Ukrytej
-        for i, val in enumerate(hidden_acts):
-            # Normalizacja koloru (0.0 -> czarny, 1.0 -> jasny zielony)
-            intensity = int(val * 255)
-            hex_col = f"#{0:02x}{intensity:02x}{0:02x}"
-            self.viz_canvas.itemconfig(self.hidden_ids[i], fill=hex_col)
-
-        # 2. Aktualizacja Warstwy Wyjściowej
-        for i, val in enumerate(output_acts):
-            intensity = int(val * 255)
-            # Jeśli neuron jest bardzo aktywny (>0.7), robimy go niebieskim
-            if val > 0.7:
-                hex_col = "#00a8ff"
-                outline = "white"
-            else:
-                hex_col = f"#{intensity:02x}{intensity:02x}{intensity:02x}" # odcienie szarości dla nieaktywnych
-                outline = ""
-            
-            self.viz_canvas.itemconfig(self.output_ids[i], fill=hex_col, outline=outline)
-
-    def _rysuj(self, event):
-        x, y = event.x, event.y
-        r = 12 # Promień pędzla wizualnego
-        self.canvas.create_oval(x-r, y-r, x+r, y+r, fill="white", outline="white")
-        
-        # Matematyka (Rysowanie do macierzy)
-        scale = 280 / ROZMIAR_SIATKI
-        grid_x, grid_y = int(x / scale), int(y / scale)
-        
-        # Pędzel "rozmyty" (dodaje wartości do sąsiadów)
-        for dy in [-1, 0, 1]:
-            for dx in [-1, 0, 1]:
-                nx, ny = grid_x + dx, grid_y + dy
-                if 0 <= nx < ROZMIAR_SIATKI and 0 <= ny < ROZMIAR_SIATKI:
-                    self.plansza[ny][nx] = min(self.plansza[ny][nx] + 0.6, 1.0)
-        
-        # Przy każdym ruchu pędzla odświeżamy wizualizację sieci!
-        # Robimy "szybki forward" bez treningu, żeby zobaczyć jak sieć reaguje na żywo
-        flat_data = self.plansza.flatten().reshape(1, WEJSCIA)
-        self.siec.forward(flat_data)
-        self._aktualizuj_wizualizacje_live()
-
-    def _koniec_rysowania(self, event):
-        # Tylko wyzwala zgadywanie po puszczeniu myszki
-        self._zgadnij()
-
-    def _zgadnij(self):
-        data = self.plansza.flatten().reshape(1, WEJSCIA)
-        wynik = self.siec.forward(data)[0]
-        idx = np.argmax(wynik)
-        pewnosc = wynik[idx]
-        
-        znak = ZNAKI[idx]
-        self.lbl_wynik.config(text=znak)
-        self.lbl_detale.config(text=f"Pewność: {pewnosc:.2%}")
-        self._aktualizuj_wizualizacje_live()
-
-    def _reset(self):
-        self.canvas.delete("all")
-        self.plansza = np.zeros((ROZMIAR_SIATKI, ROZMIAR_SIATKI))
-        self.lbl_wynik.config(text="?")
-        # Reset wizualizacji
-        for nid in self.hidden_ids: self.viz_canvas.itemconfig(nid, fill=COL_NEURON_OFF)
-        for nid in self.output_ids: self.viz_canvas.itemconfig(nid, fill=COL_NEURON_OFF)
-
-    def _ucz_recznie(self):
-        znak = self.var_znak.get()
-        idx = ZNAKI.index(znak)
-        target = np.zeros((1, WYJSCIA))
-        target[0][idx] = 1
-        
-        data = self.plansza.flatten().reshape(1, WEJSCIA)
-        self.siec.backward(data, target)
-        self.lbl_status.config(text=f"Nauczono ręcznie: {znak}", fg="#00ff00")
-        self._aktualizuj_wizualizacje_live()
-
-    def _start_mnist(self):
-        self.lbl_status.config(text="Pobieranie MNIST...", fg="yellow")
+    def inicjuj_wizualizacje(self):
         self.root.update()
+        w = self.vis_canvas.winfo_width()
+        h = self.vis_canvas.winfo_height()
         
-        path = "mnist.npz"
-        if not os.path.exists(path):
-            try:
-                urllib.request.urlretrieve("https://storage.googleapis.com/tensorflow/tf-keras-datasets/mnist.npz", path)
-            except:
-                messagebox.showerror("Błąd", "Brak internetu!")
-                return
+        self.k_in = [(30, (h/22)*(i+1)+20) for i in range(20)]
+        self.k_hid = [((w/2)-40 + (i//16)*20, (h/18)*(i%16+1)) for i in range(UKRYTE)]
+        self.k_out = [(w-50, (h/38)*(i+1)) for i in range(WYJSCIA)]
+        
+        for x,y in self.k_in: self.vis_canvas.create_oval(x-2, y-2, x+2, y+2, fill="#444", outline="")
+        for i, (x,y) in enumerate(self.k_hid): self.vis_canvas.create_oval(x-3, y-3, x+3, y+3, fill="#222", outline="", tags=f"h{i}")
+        for i, (x,y) in enumerate(self.k_out):
+            self.vis_canvas.create_text(x+20, y, text=ZNAKI[i], fill="#555", font=("Arial", 9, "bold"), tags=f"t{i}")
+            self.vis_canvas.create_oval(x-5, y-5, x+5, y+5, fill="#222", outline="", tags=f"o{i}")
 
-        with np.load(path, allow_pickle=True) as f:
-            x_train, y_train = f['x_train'], f['y_train']
+    def aktualizuj_wizualizacje(self):
+        self.vis_canvas.delete("line")
+        limit = self.var_limit.get()
         
-        # Trening na próbce 1500 (dla szybkości)
-        limit = 1500
-        x_data = x_train[:limit].reshape(limit, 784) / 255.0
-        y_labels = y_train[:limit]
+        idx_hid = np.argsort(self.siec.ukryta[0])[-25:] # Pokaż top 25 aktywnych neuronów
+        idx_win = np.argmax(self.siec.wyjscie[0])
         
-        self.lbl_status.config(text="Trening w toku...", fg="yellow")
-        
-        for i in range(limit):
-            target = np.zeros((1, WYJSCIA))
-            target[0][y_labels[i]] = 1 # Mapuje cyfrę na odpowiednie wyjście
+        for i in idx_hid:
+            val = self.siec.ukryta[0][i]
+            col_hid = f"#{0:02x}{int(val*255):02x}{0:02x}"
+            self.vis_canvas.itemconfig(f"h{i}", fill=col_hid)
             
-            # Podajemy dane jako macierz (1, 784)
-            img = x_data[i:i+1]
-            self.siec.backward(img, target)
+            waga = self.siec.w2[i][idx_win]
+            width = abs(waga) * 2 / limit
+            col_line = THEME["synapse"] if waga > 0 else THEME["alert"]
             
-            if i % 100 == 0:
-                self.root.update()
-        
-        self.lbl_status.config(text="Trening MNIST zakończony!", fg="#00ff00")
-        messagebox.showinfo("Sukces", "Sieć wytrenowana na cyfrach 0-9")
+            # Rysuj tylko silne połączenia
+            if width > 0.3:
+                x1, y1 = self.k_hid[i]
+                x2, y2 = self.k_out[idx_win]
+                self.vis_canvas.create_line(x1, y1, x2, y2, fill=col_line, width=width, tags="line")
 
-if __name__ == "__main__":
-    root = tk.Tk()
-    app = App(root)
-    root.mainloop()
+        for i in range(WYJSCIA):
+            val = self.siec.wyjscie[0][i]
+            is_win = (i == idx_win)
+            self.vis_canvas.itemconfig(f"o{i}", fill=THEME["accent"] if is_win else "#222")
+            self.vis_canvas.itemconfig(f"t{i}", fill="white" if is_win else "#444")
+
+    # --- WĄTEK EMNIST Z TASOWANIEM (SHUFFLE) ---
+    def start_watek_emnist(self):
+        plik = filedialog.askopenfilename(title="Wybierz CSV (emnist-balanced)", filetypes=[("CSV", "*.csv")])
+        if not plik: return
+        t = threading.Thread(target=self.proces_emnist, args=(plik,))
+        t.start()
+
+    def proces_emnist(self, plik):
+        if not PANDAS_DOSTEPNY: return
+
+        try:
+            self.lbl_status.config(text="Wczytywanie i tasowanie...", fg="yellow")
+            self.btn_load.config(state="disabled")
+            
+            # 1. Wczytanie
+            df = pd.read_csv(plik, header=None)
+            labels = df.iloc[:, 0].values
+            pixels = df.iloc[:, 1:].values
+            
+            # 2. Filtrowanie (tylko 0-35)
+            mask = labels < 36
+            labels = labels[mask]
+            pixels = pixels[mask]
+            
+            # 3. TASOWANIE (KLUCZOWA POPRAWKA!)
+            # Mieszamy dane, żeby sieć widziała na zmianę cyfry i litery
+            perm = np.random.permutation(len(labels))
+            labels = labels[perm]
+            pixels = pixels[perm]
+            
+            # Bierzemy więcej próbek,
